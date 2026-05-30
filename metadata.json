@@ -1,0 +1,6 @@
+{
+  "name": "OT-Care 職能治療療育紀錄系統",
+  "description": "專為職能治療師設計的兒童療育紀錄系統。支援早療（學齡前）與弱療（國小）個案管理、期初目標設定、課後療育紀錄登錄（3分至-1分評定）、居家活動建議與家長回饋執行狀態，並能完美還原與輸出列印『臺中市早期療育服務記錄表』。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
