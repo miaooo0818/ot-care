@@ -4,8 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { KidCase, KidStage, GoalTemplate } from '../types';
-import { DEFAULT_THERAPIST } from '../initialData';
+import { KidCase, KidStage, GoalTemplate, Therapist } from '../types';
 import { 
   Search, Plus, Shield, Users, Award, BookOpen, Clock, 
   Baby, GraduationCap, ChevronRight, X, Phone, Calendar, ClipboardList 
@@ -15,6 +14,7 @@ interface TherapistDashboardProps {
   cases: KidCase[];
   recordsCountMap: { [caseId: string]: number };
   goalTemplates: GoalTemplate[];
+  therapist: Therapist;
   onSelectCase: (caseId: string) => void;
   onAddCase: (newCase: KidCase) => void;
 }
@@ -23,6 +23,7 @@ export default function TherapistDashboard({
   cases, 
   recordsCountMap, 
   goalTemplates,
+  therapist,
   onSelectCase, 
   onAddCase 
 }: TherapistDashboardProps) {
@@ -93,8 +94,8 @@ export default function TherapistDashboard({
       stage: computedStage,
       caregiverName,
       phone,
-      therapistName: DEFAULT_THERAPIST.name,
-      specialty: '職能治療',
+      therapistName: therapist.name,
+      specialty: therapist.specialty,
       therapyPeriodStart,
       therapyPeriodEnd,
       goals: initialGoals,
@@ -138,7 +139,7 @@ export default function TherapistDashboard({
             <span className="text-[11px] font-display font-bold text-slate-500 uppercase tracking-widest">職能治療師 OT 系統終端</span>
           </div>
           <h1 className="text-xl md:text-2xl font-display font-black text-geometric-black tracking-tight leading-tight">
-            許美華 老師，您好！
+            {therapist.name} 老師，您好！
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
             本紀錄系統融合了<span className="text-geometric-accent font-semibold">早療（學齡前 0~6 歲兒童，主攻感覺統合與精細動作）</span>與<span className="text-indigo-600 font-semibold">弱療（國小 6~12 歲，主攻寫字、抄寫空間知覺與情緒調節規則）</span>個案管理，幫助您無縫設定期初目標並快速且高品質地登錄課後表現分數與居家活動，即時匯出與列印「臺中市早期療育服務記錄表」。
