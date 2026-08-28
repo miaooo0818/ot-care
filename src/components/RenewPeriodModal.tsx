@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { KidCase, Goal, GoalTemplate } from '../types';
 import { calculateTherapyPeriodEnd } from '../utils/periodUtils';
 import { RefreshCw, Calendar, Award, ArrowRight, X, AlertCircle, Copy, Check, Plus, Trash2 } from 'lucide-react';
+import AIGoalTargetGenerator from './AIGoalTargetGenerator';
 
 interface RenewPeriodModalProps {
   kidCase: KidCase;
@@ -14,6 +15,7 @@ interface RenewPeriodModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirmRenewal: (renewedCase: KidCase) => void;
+  onSaveGoalTemplate?: (template: { category?: string; baseline: string; target: string }) => void;
 }
 
 export default function RenewPeriodModal({
@@ -21,7 +23,8 @@ export default function RenewPeriodModal({
   goalTemplates,
   isOpen,
   onClose,
-  onConfirmRenewal
+  onConfirmRenewal,
+  onSaveGoalTemplate
 }: RenewPeriodModalProps) {
   if (!isOpen) return null;
 
@@ -145,6 +148,19 @@ export default function RenewPeriodModal({
       therapyPeriodEnd: newPeriodEnd,
       goals: finalGoals
     };
+
+    // 若有自訂輸入的新目標，自動建檔儲存至目標範本庫
+    if (onSaveGoalTemplate) {
+      finalGoals.forEach(g => {
+        if (g.baseline.trim() && g.target.trim()) {
+          onSaveGoalTemplate({
+            category: '精細動作',
+            baseline: g.baseline,
+            target: g.target
+          });
+        }
+      });
+    }
 
     onConfirmRenewal(renewedCase);
     onClose();
@@ -359,10 +375,22 @@ export default function RenewPeriodModal({
                     />
                   </div>
 
+                  {/* AI 智能量化目標生成工具 */}
+                  <div className="pt-0.5">
+                    <AIGoalTargetGenerator
+                      baseline={g.baseline}
+                      kidName={kidCase.name}
+                      kidStage={kidCase.stage}
+                      therapyDuration={selectedDuration === 6 ? '半年 (6個月)' : '三個月'}
+                      currentTarget={g.target}
+                      onApplyTarget={(targetText) => handleGoalChange(idx, 'target', targetText)}
+                    />
+                  </div>
+
                   {/* New Target Input */}
                   <div>
                     <label className="block text-slate-700 font-bold mb-1 text-[11px]">
-                      新一期預期達成之療育目標行為 <span className="text-rose-500">*</span>
+                      新一期預期達成之療育目標行為 (可點擊上方 AI 生成直接套用) <span className="text-rose-500">*</span>
                     </label>
                     <textarea
                       rows={2}
