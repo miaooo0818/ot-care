@@ -8,7 +8,8 @@ import { KidCase, LessonRecord, Therapist } from './types';
 export const DEFAULT_THERAPIST: Therapist = {
   username: 'ot_hsu',
   name: '許美華',
-  specialty: '兒童職能治療 (OT)'
+  specialty: '兒童職能治療 (OT)',
+  licenseNumber: '職字第 003829 號'
 };
 
 export const INITIAL_CASES: KidCase[] = [
