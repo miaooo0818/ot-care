@@ -79,6 +79,38 @@ export default function App() {
     localStorage.setItem('ot_goal_templates', JSON.stringify(updatedTemplates));
   };
 
+  // 儲存/自動建檔目標範本 (若使用者手動輸入新現況/目標時可持久化成新範本)
+  const handleSaveGoalTemplate = (templateData: { category?: string; baseline: string; target: string }) => {
+    if (!templateData.baseline.trim()) return;
+    const cat = templateData.category?.trim() || '精細動作';
+    const base = templateData.baseline.trim();
+    const tgt = templateData.target.trim() || '依臨床量化目標達成';
+
+    // 檢查是否已存在相同 baseline 的範本
+    const existingIndex = goalTemplates.findIndex(
+      t => t.baseline.trim().toLowerCase() === base.toLowerCase()
+    );
+
+    let updated: GoalTemplate[];
+    if (existingIndex >= 0) {
+      updated = [...goalTemplates];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        category: cat,
+        target: tgt,
+      };
+    } else {
+      const newTpl: GoalTemplate = {
+        id: `tpl_custom_${Date.now()}`,
+        category: cat,
+        baseline: base,
+        target: tgt,
+      };
+      updated = [newTpl, ...goalTemplates];
+    }
+    syncTemplates(updated);
+  };
+
   const syncTherapist = (updatedTherapist: Therapist) => {
     // 也能連帶把目前所有個案中，若符合「舊治療師姓名」的自動同步更新，避免既有資料也一直顯示舊名字
     const oldName = therapist.name;
@@ -260,6 +292,7 @@ export default function App() {
               setView('detail');
             }}
             onAddCase={handleAddCase}
+            onSaveGoalTemplate={handleSaveGoalTemplate}
           />
         ) : (
           activeCase && (
@@ -272,6 +305,7 @@ export default function App() {
                 setSelectedCaseId(null);
               }}
               onEditCase={handleEditCase}
+              onSaveGoalTemplate={handleSaveGoalTemplate}
               onAddRecord={() => {
                 setRecordToEdit(undefined);
                 setIsRecordFormOpen(true);
