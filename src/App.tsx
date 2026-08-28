@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { KidCase, LessonRecord, GoalTemplate } from './types';
+import { KidCase, LessonRecord, GoalTemplate, Therapist } from './types';
 import { INITIAL_CASES, INITIAL_RECORDS, DEFAULT_THERAPIST } from './initialData';
 import { DEFAULT_GOAL_TEMPLATES } from './goalTemplates';
 import TherapistDashboard from './components/TherapistDashboard';
@@ -19,6 +19,7 @@ export default function App() {
   const [cases, setCases] = useState<KidCase[]>([]);
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [goalTemplates, setGoalTemplates] = useState<GoalTemplate[]>([]);
+  const [therapist, setTherapist] = useState<Therapist>(DEFAULT_THERAPIST);
 
   // 路由/頁面切換 State
   const [view, setView] = useState<'dashboard' | 'detail' | 'admin'>('dashboard');
@@ -34,6 +35,7 @@ export default function App() {
     const storedCases = localStorage.getItem('ot_cases');
     const storedRecords = localStorage.getItem('ot_records');
     const storedTemplates = localStorage.getItem('ot_goal_templates');
+    const storedTherapist = localStorage.getItem('ot_therapist');
 
     if (storedCases && storedRecords) {
       setCases(JSON.parse(storedCases));
@@ -52,6 +54,13 @@ export default function App() {
       localStorage.setItem('ot_goal_templates', JSON.stringify(DEFAULT_GOAL_TEMPLATES));
       setGoalTemplates(DEFAULT_GOAL_TEMPLATES);
     }
+
+    if (storedTherapist) {
+      setTherapist(JSON.parse(storedTherapist));
+    } else {
+      localStorage.setItem('ot_therapist', JSON.stringify(DEFAULT_THERAPIST));
+      setTherapist(DEFAULT_THERAPIST);
+    }
   }, []);
 
   // 當資料有變時自動調用 localStorage 同步
@@ -68,6 +77,29 @@ export default function App() {
   const syncTemplates = (updatedTemplates: GoalTemplate[]) => {
     setGoalTemplates(updatedTemplates);
     localStorage.setItem('ot_goal_templates', JSON.stringify(updatedTemplates));
+  };
+
+  const syncTherapist = (updatedTherapist: Therapist) => {
+    // 也能連帶把目前所有個案中，若符合「舊治療師姓名」的自動同步更新，避免既有資料也一直顯示舊名字
+    const oldName = therapist.name;
+    const updatedCases = cases.map(c => {
+      if (c.therapistName === oldName) {
+        return { 
+          ...c, 
+          therapistName: updatedTherapist.name,
+          specialty: updatedTherapist.specialty 
+        };
+      }
+      return c;
+    });
+
+    setTherapist(updatedTherapist);
+    localStorage.setItem('ot_therapist', JSON.stringify(updatedTherapist));
+    
+    // 如果個案資料有因爲姓名不同而需要更新，則同步寫入 localStorage
+    if (JSON.stringify(updatedCases) !== JSON.stringify(cases)) {
+      syncCases(updatedCases);
+    }
   };
 
   // CRUD: 個案基本資料管理 (新增、編輯)
@@ -170,7 +202,9 @@ export default function App() {
             {/* 治療師當前身分 */}
             <div className="hidden sm:flex items-center gap-3 bg-geometric-dark/80 border border-slate-700/80 px-3.5 py-1.5 rounded-lg">
               <span className="w-2 h-2 rounded-full bg-geometric-accent block animate-pulse"></span>
-              <span className="text-slate-300 font-mono">負責師：{DEFAULT_THERAPIST.name} ({DEFAULT_THERAPIST.specialty})</span>
+              <span className="text-slate-300 font-mono">
+                負責師：{therapist.name} ({therapist.specialty}{therapist.licenseNumber ? ` · ${therapist.licenseNumber}` : ''})
+              </span>
             </div>
 
             {/* 系統後台管理按鈕 */}
@@ -207,7 +241,9 @@ export default function App() {
             cases={cases}
             records={records}
             goalTemplates={goalTemplates}
+            therapist={therapist}
             onUpdateTemplates={syncTemplates}
+            onUpdateTherapist={syncTherapist}
             onBack={() => setView('dashboard')}
             onUpdateCases={(updatedCases) => syncCases(updatedCases)}
             onUpdateRecords={(updatedRecords) => syncRecords(updatedRecords)}
@@ -218,6 +254,7 @@ export default function App() {
             cases={cases}
             recordsCountMap={getRecordsCountMap()}
             goalTemplates={goalTemplates}
+            therapist={therapist}
             onSelectCase={(caseId) => {
               setSelectedCaseId(caseId);
               setView('detail');
@@ -274,10 +311,11 @@ export default function App() {
       )}
 
       {/* 臺中市早期療育服務記錄表 A4 藍晒特寫與 PDF 下載列印預覽器 */}
-      {printRecord && activeCase && (
+      {printRecord && (
         <PrintRecordTable
-          kidCase={activeCase}
+          kidCase={cases.find(c => c.id === printRecord.caseId) || activeCase!}
           record={printRecord}
+          therapist={therapist}
           onClose={() => setPrintRecord(null)}
         />
       )}
