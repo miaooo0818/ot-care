@@ -5,11 +5,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { KidCase, LessonRecord, Goal, KidStage, HomeActivityStatus, SCORE_OPTIONS, HOME_ACTIVITY_STATUS_DETAILS, GoalTemplate, Therapist } from '../types';
+import { STANDARD_DOMAINS } from '../goalTemplates';
 import { 
   Shield, Lock, Unlock, Key, Settings, Trash2, Edit, FileSpreadsheet, 
   FileText, Download, Printer, Search, ArrowLeft, LogOut, Info, 
   Calendar, Users, Award, X, Check, Plus, AlertTriangle, ChevronRight, BarChart3, Star, Filter, FolderPlus
 } from 'lucide-react';
+import AIGoalTargetGenerator from './AIGoalTargetGenerator';
+import ExportDocxModal from './ExportDocxModal';
+import { exportCombinedCasesToDocx } from '../utils/docxExport';
 
 interface AdminPanelProps {
   cases: KidCase[];
@@ -124,6 +128,7 @@ export default function AdminPanel({
 
   // Selected Kid for Semester Summary Report Card
   const [selectedReportKidId, setSelectedReportKidId] = useState<string>('');
+  const [isDocxModalOpen, setIsDocxModalOpen] = useState(false);
 
   // Password setup/auth verification
   useEffect(() => {
@@ -835,7 +840,113 @@ export default function AdminPanel({
 
       {/* TAB 3: FILE EXPORT & COMPREHENSIVE PROGRESS REPORT */}
       {activeTab === 'export' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="space-y-6">
+          {/* Top Featured: Standard DOCX Export Center */}
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-6 shadow-md border border-indigo-500/20">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                    Official DOCX Form Generator
+                  </span>
+                  <span className="text-[11px] text-slate-300">
+                    分為早療（學齡前）／ 弱療（國小）
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-display font-black text-white tracking-wide flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-400" />
+                  臺中市療育服務記錄表 (Word / DOCX) 匯出專區
+                </h2>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  格式嚴格依照中國醫藥大學孫世恆副教授編制規範（A4 橫向、標楷體、期初能力現況與目標對齊、歷次評分及居家活動狀況），可匯出為可編輯的 Microsoft Word (.docx) 檔案。
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2.5 w-full md:w-auto shrink-0 font-display">
+                <button
+                  type="button"
+                  onClick={() => setIsDocxModalOpen(true)}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-xs font-black transition cursor-pointer shadow-lg shadow-indigo-500/25 active:scale-98"
+                >
+                  <Download className="w-4 h-4" />
+                  自訂選項並匯出 Word
+                </button>
+              </div>
+            </div>
+
+            {/* Quick action cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-4 border-t border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={async () => {
+                  const earlyCases = cases.filter(c => c.stage === 'early');
+                  if (earlyCases.length === 0) {
+                    alert('目前系統中尚無學齡前早療個案！');
+                    return;
+                  }
+                  await exportCombinedCasesToDocx(earlyCases, records, '學齡前早療個案彙編', { therapist });
+                }}
+                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
+              >
+                <div>
+                  <div className="font-bold text-white group-hover:text-indigo-200 transition">
+                    匯出早療個案 Word (.docx)
+                  </div>
+                  <div className="text-[10px] text-slate-300 mt-0.5">
+                    學齡前早療・共 {earlyCount} 位（獨立分頁彙整）
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-indigo-300 opacity-80 group-hover:opacity-100" />
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const weakCases = cases.filter(c => c.stage === 'weak');
+                  if (weakCases.length === 0) {
+                    alert('目前系統中尚無國小弱療個案！');
+                    return;
+                  }
+                  await exportCombinedCasesToDocx(weakCases, records, '國小弱療個案彙編', { therapist });
+                }}
+                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
+              >
+                <div>
+                  <div className="font-bold text-white group-hover:text-emerald-200 transition">
+                    匯出弱療個案 Word (.docx)
+                  </div>
+                  <div className="text-[10px] text-slate-300 mt-0.5">
+                    國小弱療・共 {weakCount} 位（獨立分頁彙整）
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-emerald-300 opacity-80 group-hover:opacity-100" />
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (cases.length === 0) {
+                    alert('目前系統中尚無個案！');
+                    return;
+                  }
+                  await exportCombinedCasesToDocx(cases, records, '全體個案總彙編', { therapist });
+                }}
+                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
+              >
+                <div>
+                  <div className="font-bold text-white group-hover:text-amber-200 transition">
+                    匯出全體個案總彙編 Word
+                  </div>
+                  <div className="text-[10px] text-slate-300 mt-0.5">
+                    包含早療與弱療・共 {cases.length} 位
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-amber-300 opacity-80 group-hover:opacity-100" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Left Panel: CSV Data Center */}
           <div className="lg:col-span-4 bg-white border border-geometric-border rounded-xl p-5 space-y-4 shadow-xs">
@@ -1079,7 +1190,7 @@ export default function AdminPanel({
             <button
               onClick={() => {
                 setEditingTemplateId(null);
-                setTplCategory('精細動作與書寫');
+                setTplCategory('精細動作');
                 setTplBaseline('');
                 setTplTarget('');
                 setIsAddingTemplate(true);
@@ -1092,16 +1203,50 @@ export default function AdminPanel({
           </div>
 
           {/* Filtering Controls */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="space-y-2.5">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 hover:text-indigo-500" />
               <input
                 type="text"
-                placeholder="搜尋範本內容 (例如：手部、注意力、數字、自理...)"
+                placeholder="搜尋範本內容 (例如：精細動作、衝動控制、跳躍、注意力、自理...)"
                 value={templateSearchQuery}
                 onChange={e => setTemplateSearchQuery(e.target.value)}
                 className="w-full text-xs pl-9 pr-4 py-2 bg-slate-50 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent focus:bg-white text-slate-700 font-semibold transition"
               />
+            </div>
+
+            {/* 領域快速篩選標籤 */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] text-slate-400 font-bold shrink-0">領域：</span>
+              <button
+                type="button"
+                onClick={() => setTemplateSearchQuery('')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition shrink-0 cursor-pointer ${
+                  templateSearchQuery === ''
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                全部 ({goalTemplates.length})
+              </button>
+              {STANDARD_DOMAINS.map(d => {
+                const count = goalTemplates.filter(t => t.category === d).length;
+                const isActive = templateSearchQuery === d;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setTemplateSearchQuery(isActive ? '' : d)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition shrink-0 cursor-pointer ${
+                      isActive
+                        ? 'bg-geometric-accent text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {d} ({count})
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1125,18 +1270,15 @@ export default function AdminPanel({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-1 space-y-1">
-                  <label className="block text-slate-600 text-[11px] font-bold">範本適用類別</label>
+                  <label className="block text-slate-600 text-[11px] font-bold">範本適用領域類別</label>
                   <select
                     value={tplCategory}
                     onChange={e => setTplCategory(e.target.value)}
                     className="w-full text-xs p-2 border border-geometric-border bg-white text-slate-700 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent font-semibold cursor-pointer"
                   >
-                    <option value="精細動作與書寫">精細動作與書寫</option>
-                    <option value="精細動作與雙手協調">精細動作與雙手協調</option>
-                    <option value="粗大動作與感覺統合">粗大動作與感覺統合</option>
-                    <option value="注意力與情緒調節">注意力與情緒調節</option>
-                    <option value="認知與概念學習">認知與概念學習</option>
-                    <option value="生活自理(ADL)">生活自理(ADL)</option>
+                    {STANDARD_DOMAINS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1150,6 +1292,16 @@ export default function AdminPanel({
                     onChange={e => setTplBaseline(e.target.value)}
                     className="w-full text-xs p-2 border border-geometric-border rounded-lg bg-white text-slate-700 font-semibold"
                   />
+                  
+                  {/* AI 智能生成目標 */}
+                  <div className="pt-1">
+                    <AIGoalTargetGenerator
+                      baseline={tplBaseline}
+                      customFocus={tplCategory}
+                      currentTarget={tplTarget}
+                      onApplyTarget={(targetText) => setTplTarget(targetText)}
+                    />
+                  </div>
                 </div>
 
                 <div className="md:col-span-1 space-y-1">
@@ -1538,6 +1690,16 @@ export default function AdminPanel({
                             placeholder="例：精細三指抓力過小，不自覺發起扭臀小動作配合..."
                             className="w-full text-xs p-1.5 border border-geometric-border rounded-md bg-white text-slate-700 font-medium"
                           />
+                          
+                          <div className="pt-0.5">
+                            <AIGoalTargetGenerator
+                              baseline={goal.baseline}
+                              kidName={editingCase.name}
+                              kidStage={editingCase.stage}
+                              currentTarget={goal.target}
+                              onApplyTarget={(targetText) => handleGoalChange(index, 'target', targetText)}
+                            />
+                          </div>
                         </div>
                         <div>
                           <div className="flex justify-between items-center mb-0.5">
@@ -1753,6 +1915,15 @@ export default function AdminPanel({
           </div>
         </div>
       )}
+
+      {/* 批次匯出 Word / DOCX 彈窗 */}
+      <ExportDocxModal
+        isOpen={isDocxModalOpen}
+        onClose={() => setIsDocxModalOpen(false)}
+        allCases={cases}
+        allRecords={records}
+        therapist={therapist}
+      />
 
     </div>
   );
