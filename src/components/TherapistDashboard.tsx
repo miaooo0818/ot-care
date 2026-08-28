@@ -7,8 +7,9 @@ import React, { useState } from 'react';
 import { KidCase, KidStage, GoalTemplate, Therapist } from '../types';
 import { 
   Search, Plus, Shield, Users, Award, BookOpen, Clock, 
-  Baby, GraduationCap, ChevronRight, X, Phone, Calendar, ClipboardList 
+  Baby, GraduationCap, ChevronRight, X, Phone, Calendar, ClipboardList, Check, AlertCircle 
 } from 'lucide-react';
+import { calculateTherapyPeriodEnd, checkTherapyPeriodStatus } from '../utils/periodUtils';
 
 interface TherapistDashboardProps {
   cases: KidCase[];
@@ -38,11 +39,26 @@ export default function TherapistDashboard({
   const [caregiverName, setCaregiverName] = useState('');
   const [phone, setPhone] = useState('');
   const [therapyPeriodStart, setTherapyPeriodStart] = useState('2026-05');
+  const [selectedDuration, setSelectedDuration] = useState<3 | 6>(6);
   const [therapyPeriodEnd, setTherapyPeriodEnd] = useState('2026-10');
   
   // 隨案直接添加第一條期初目標，以便快速體驗
   const [initBaseline, setInitBaseline] = useState('');
   const [initTarget, setInitTarget] = useState('');
+
+  const handleStartChange = (val: string) => {
+    setTherapyPeriodStart(val);
+    if (val) {
+      setTherapyPeriodEnd(calculateTherapyPeriodEnd(val, selectedDuration));
+    }
+  };
+
+  const handleDurationChange = (dur: 3 | 6) => {
+    setSelectedDuration(dur);
+    if (therapyPeriodStart) {
+      setTherapyPeriodEnd(calculateTherapyPeriodEnd(therapyPeriodStart, dur));
+    }
+  };
 
   // 算年齡
   const getAge = (birthdayStr: string) => {
@@ -287,13 +303,36 @@ export default function TherapistDashboard({
                       className="hover:bg-slate-50/50 transition cursor-pointer"
                       onClick={() => onSelectCase(c.id)}
                     >
-                      {/* 姓名生日 */}
+                      {/* 姓名生日與期程 */}
                       <td className="p-4">
                         <div className="flex flex-col">
-                          <span className="font-display font-black text-sm text-geometric-black tracking-wide">{c.name}</span>
-                          <span className="text-[11px] text-slate-400 font-mono mt-0.5">
-                            生日：{c.birthday} ({age} 歲)
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-display font-black text-sm text-geometric-black tracking-wide">{c.name}</span>
+                            {(() => {
+                              const pStatus = checkTherapyPeriodStatus(c.therapyPeriodEnd);
+                              if (pStatus.isExpired) {
+                                return (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold font-display flex items-center gap-0.5">
+                                    <AlertCircle className="w-2.5 h-2.5" />
+                                    期程已屆滿
+                                  </span>
+                                );
+                              } else if (pStatus.isExpiringSoon) {
+                                return (
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 text-[10px] font-bold font-display flex items-center gap-0.5">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    本月屆滿
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+                            <span>生日：{c.birthday} ({age} 歲)</span>
+                            <span>•</span>
+                            <span className="text-slate-500">期程：{c.therapyPeriodStart}~{c.therapyPeriodEnd}</span>
+                          </div>
                         </div>
                       </td>
 
@@ -434,26 +473,65 @@ export default function TherapistDashboard({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-700 mb-1">療育期間 (起) <span className="text-rose-500">*</span></label>
-                  <input
-                    type="month"
-                    required
-                    value={therapyPeriodStart}
-                    onChange={e => setTherapyPeriodStart(e.target.value)}
-                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs bg-white text-slate-800"
-                  />
+              {/* 療育期間設定 */}
+              <div className="bg-slate-50 p-3.5 border border-geometric-border rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-800 font-bold text-xs">
+                    療育期間設定
+                  </label>
+                  <div className="flex gap-1.5 select-none">
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(6)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                        selectedDuration === 6
+                          ? 'bg-geometric-accent text-white border-geometric-accent shadow-xs'
+                          : 'bg-white text-slate-600 border-geometric-border hover:bg-slate-100'
+                      }`}
+                    >
+                      {selectedDuration === 6 && <Check className="w-3 h-3" />}
+                      半年 (6個月)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(3)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                        selectedDuration === 3
+                          ? 'bg-geometric-accent text-white border-geometric-accent shadow-xs'
+                          : 'bg-white text-slate-600 border-geometric-border hover:bg-slate-100'
+                      }`}
+                    >
+                      {selectedDuration === 3 && <Check className="w-3 h-3" />}
+                      三個月
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-slate-700 mb-1">療育期間 (迄) <span className="text-rose-500">*</span></label>
-                  <input
-                    type="month"
-                    required
-                    value={therapyPeriodEnd}
-                    onChange={e => setTherapyPeriodEnd(e.target.value)}
-                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs bg-white text-slate-800"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-600 text-[11px] mb-1 font-semibold">
+                      起始月份 (自選) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      required
+                      value={therapyPeriodStart}
+                      onChange={e => handleStartChange(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 text-[11px] mb-1 font-semibold">
+                      療育期間 (訖) (自動計算) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      required
+                      value={therapyPeriodEnd}
+                      onChange={e => setTherapyPeriodEnd(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs font-mono font-bold"
+                    />
+                  </div>
                 </div>
               </div>
 
