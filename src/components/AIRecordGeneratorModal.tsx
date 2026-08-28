@@ -60,6 +60,7 @@ export default function AIRecordGeneratorModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           kidName: kidCase.name,
@@ -72,10 +73,19 @@ export default function AIRecordGeneratorModal({
         }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'AI 生成紀錄失敗，請檢查網路或 API 設定。');
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const rawText = await response.text();
+        console.warn('Non-JSON response from server:', rawText);
+        throw new Error('伺服器通訊異常，請確認後端服務已啟動。');
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || `生成失敗 (${response.status})，請稍後重試。`);
       }
 
       setGeneratedResult(data.data);
