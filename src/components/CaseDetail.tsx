@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { calculateTherapyPeriodEnd, checkTherapyPeriodStatus } from '../utils/periodUtils';
 import RenewPeriodModal from './RenewPeriodModal';
+import AIGoalTargetGenerator from './AIGoalTargetGenerator';
+import DomainBehaviorSelector from './DomainBehaviorSelector';
+import ExportDocxModal from './ExportDocxModal';
 
 interface CaseDetailProps {
   kidCase: KidCase;
@@ -22,6 +25,7 @@ interface CaseDetailProps {
   onEditRecord: (record: LessonRecord) => void;
   onDeleteRecord: (recordId: string) => void;
   onPrintRecord: (record: LessonRecord) => void;
+  onSaveGoalTemplate?: (template: { category?: string; baseline: string; target: string }) => void;
 }
 
 export default function CaseDetail({
@@ -33,11 +37,13 @@ export default function CaseDetail({
   onAddRecord,
   onEditRecord,
   onDeleteRecord,
-  onPrintRecord
+  onPrintRecord,
+  onSaveGoalTemplate
 }: CaseDetailProps) {
   // 控制 State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [isDocxModalOpen, setIsDocxModalOpen] = useState(false);
 
   const [name, setName] = useState(kidCase.name);
   const [birthday, setBirthday] = useState(kidCase.birthday);
@@ -83,11 +89,12 @@ export default function CaseDetail({
   const [isAddingGoal, setIsAddingGoal] = useState(false);
   const [newBaseline, setNewBaseline] = useState('');
   const [newTarget, setNewTarget] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('精細動作');
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
 
   // 計算兒童實際年齡
-  const getAgeString = (birthdayStr: string) => {
-    if (!birthdayStr) return '';
+  const getAge = (birthdayStr: string) => {
+    if (!birthdayStr) return 0;
     const birth = new Date(birthdayStr);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
@@ -95,7 +102,13 @@ export default function CaseDetail({
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    return age >= 0 ? `${age} 歲` : '嬰幼兒';
+    return age >= 0 ? age : 0;
+  };
+
+  const getAgeString = (birthdayStr: string) => {
+    if (!birthdayStr) return '';
+    const age = getAge(birthdayStr);
+    return age > 0 ? `${age} 歲` : '嬰幼兒';
   };
 
   // 儲存個案基本資料
@@ -148,8 +161,18 @@ export default function CaseDetail({
       goals: updatedGoals
     });
 
+    // 自動將手動輸入/修改的目標建檔儲存至範本庫
+    if (newBaseline.trim() && onSaveGoalTemplate) {
+      onSaveGoalTemplate({
+        category: selectedCategory || '精細動作',
+        baseline: newBaseline.trim(),
+        target: newTarget.trim(),
+      });
+    }
+
     setNewBaseline('');
     setNewTarget('');
+    setSelectedCategory('精細動作');
     setEditingGoalId(null);
     setIsAddingGoal(false);
   };
@@ -371,6 +394,13 @@ export default function CaseDetail({
 
         <div className="flex flex-wrap gap-2.5 w-full sm:w-auto font-display">
           <button
+            onClick={() => setIsDocxModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center shadow-sm"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            匯出 DOCX 記錄表 (Word)
+          </button>
+          <button
             onClick={() => setIsRenewModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-geometric-accent border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center shadow-xs"
           >
@@ -565,10 +595,21 @@ export default function CaseDetail({
 
       {/* 歷次療育服務紀錄歷程 */}
       <div className="space-y-4">
-        <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-1.5 select-none">
-          <Award className="w-4 h-4 text-geometric-accent" />
-          歷次療育課後分數表現與紀錄歷程 ({records.length} 堂)
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 select-none">
+          <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-1.5">
+            <Award className="w-4 h-4 text-geometric-accent" />
+            歷次療育課後分數表現與紀錄歷程 ({records.length} 堂)
+          </h3>
+          {records.length > 0 && (
+            <button
+              onClick={() => setIsDocxModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition cursor-pointer self-start sm:self-auto shadow-2xs"
+            >
+              <FileText className="w-3.5 h-3.5 text-indigo-600" />
+              匯出整期服務記錄表 (.docx)
+            </button>
+          )}
+        </div>
 
         {descRecords.length === 0 ? (
           <div className="bg-white p-12 text-center border border-dashed border-geometric-border rounded-xl space-y-3">
@@ -902,92 +943,67 @@ export default function CaseDetail({
             </div>
 
             <form onSubmit={handleAddOrEditGoalSubmit} className="p-5 space-y-4 font-semibold">
-              {/* 快速帶入評估能力與目標行為之範本 */}
-              <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 flex flex-col gap-1 text-[11px]">
-                <label className="text-emerald-850 font-bold flex items-center gap-1 leading-none select-none">
-                  <Award className="w-3.5 h-3.5 text-emerald-650 animate-pulse" />
-                  套用專屬臨床能力與療育行為範本庫
-                </label>
-                <select
-                  onChange={(e) => {
-                    const tplId = e.target.value;
-                    if (!tplId) return;
-                    const selectedTpl = goalTemplates.find(t => t.id === tplId);
-                    if (selectedTpl) {
-                      setNewBaseline(selectedTpl.baseline);
-                      setNewTarget(selectedTpl.target);
-                    }
-                    e.target.value = ''; // 恢復
-                  }}
-                  className="w-full text-[11px] p-1.5 border border-emerald-200 bg-white text-emerald-950 font-semibold rounded-md cursor-pointer focus:outline-hidden"
-                >
-                  <option value="">🍀展開選擇適用 OT 期初 & 目標範本...</option>
-                  {goalTemplates.map(t => (
-                    <option key={t.id} value={t.id}>
-                      [{t.category}] {t.baseline.substring(0, 22)}...
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 領域 ➔ 行為表現 兩階段範本選單 */}
+              <DomainBehaviorSelector
+                goalTemplates={goalTemplates}
+                selectedCategory={selectedCategory}
+                onSelectCategory={(cat) => setSelectedCategory(cat)}
+                onSelectTemplate={(tpl) => {
+                  setNewBaseline(tpl.baseline);
+                  setNewTarget(tpl.target);
+                  setSelectedCategory(tpl.category);
+                }}
+                onSaveNewTemplate={(tplData) => {
+                  if (onSaveGoalTemplate) {
+                    onSaveGoalTemplate(tplData);
+                  }
+                }}
+                currentBaseline={newBaseline}
+                currentTarget={newTarget}
+              />
 
-              <div>
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5 mb-1">
-                  <label className="block text-slate-700 text-xs font-bold">本次期初能力行為描述</label>
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        setNewBaseline(e.target.value);
-                      }
-                      e.target.value = '';
-                    }}
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-350 px-1.5 py-0.5 rounded cursor-pointer max-w-[240px] font-semibold focus:outline-hidden"
-                  >
-                    <option value="">📋 選擇期初能力範本...</option>
-                    {goalTemplates.map(t => (
-                      <option key={t.id} value={t.baseline}>
-                        [{t.category}] {t.baseline.substring(0, 24)}...
-                      </option>
-                    ))}
-                  </select>
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-slate-700 text-xs font-bold mb-1">
+                    期初能力行為現況描述 (Baseline) <span className="text-slate-400 font-normal">（可由上方選單挑選或手動編輯）</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={2.5}
+                    placeholder="例如：三指抓握畫筆時力道不勻，握筆過緊；或無法穩定雙腳離地向前連續跳躍..."
+                    value={newBaseline}
+                    onChange={e => setNewBaseline(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
+                  />
                 </div>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="例如：三指抓握畫筆時力道不勻，不正確；或雙腳跳躍平衡感待強..."
-                  value={newBaseline}
-                  onChange={e => setNewBaseline(e.target.value)}
-                  className="w-full text-xs p-2.5 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
-                />
-              </div>
 
-              <div>
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5 mb-1">
-                  <label className="block text-slate-700 text-xs font-bold">療育目標行為描述</label>
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        setNewTarget(e.target.value);
-                      }
-                      e.target.value = '';
-                    }}
-                    className="text-[10px] bg-sky-50 hover:bg-sky-100 text-sky-850 border border-sky-150 px-1.5 py-0.5 rounded cursor-pointer max-w-[240px] font-semibold focus:outline-hidden"
-                  >
-                    <option value="">🎯 選擇期待目標範本...</option>
-                    {goalTemplates.map(t => (
-                      <option key={t.id} value={t.target}>
-                        [{t.category}] {t.target.substring(0, 24)}...
-                      </option>
-                    ))}
-                  </select>
+                {/* AI 智能量化目標生成工具 */}
+                <div className="pt-0.5">
+                  <AIGoalTargetGenerator
+                    baseline={newBaseline}
+                    kidName={kidCase.name}
+                    kidAge={getAge(kidCase.birthday)}
+                    kidStage={kidCase.stage}
+                    therapyDuration={`${kidCase.therapyPeriodStart} ~ ${kidCase.therapyPeriodEnd}`}
+                    customFocus={selectedCategory}
+                    currentTarget={newTarget}
+                    onApplyTarget={(targetText) => setNewTarget(targetText)}
+                  />
                 </div>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="例如：能不跌倒、穩定向前跳3格；或能用正確三指姿抓筆在圓圈內圖滿..."
-                  value={newTarget}
-                  onChange={e => setNewTarget(e.target.value)}
-                  className="w-full text-xs p-2.5 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
-                />
+
+                <div>
+                  <label className="block text-slate-700 text-xs font-bold mb-1">
+                    預期達成之療育目標行為 (Target) <span className="text-slate-400 font-normal">（可點擊上方 AI 智能生成直接套用）</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={2.5}
+                    placeholder="例如：能穩定採用動態三指握姿在 2 公分正方形格內著色不超出邊界，達成率 80%..."
+                    value={newTarget}
+                    onChange={e => setNewTarget(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2.5 pt-2 select-none font-bold font-display">
@@ -1024,6 +1040,15 @@ export default function CaseDetail({
         onConfirmRenewal={(renewedCase) => {
           onEditCase(renewedCase);
         }}
+        onSaveGoalTemplate={onSaveGoalTemplate}
+      />
+
+      {/* 匯出 Word / DOCX 彈窗 */}
+      <ExportDocxModal
+        isOpen={isDocxModalOpen}
+        onClose={() => setIsDocxModalOpen(false)}
+        kidCase={kidCase}
+        records={records}
       />
 
     </div>
