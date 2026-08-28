@@ -66,6 +66,7 @@ export interface Therapist {
   username: string;
   name: string;
   specialty: string;
+  licenseNumber?: string; // 治療師執照證號 / 證書字號
 }
 
 export interface GoalTemplate {
