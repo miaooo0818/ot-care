@@ -4,19 +4,24 @@
  */
 
 import React from 'react';
-import { KidCase, LessonRecord, HOME_ACTIVITY_STATUS_DETAILS } from '../types';
+import { KidCase, LessonRecord, Therapist, HOME_ACTIVITY_STATUS_DETAILS } from '../types';
 import { Printer, X, FileText, Check } from 'lucide-react';
 
 interface PrintRecordTableProps {
   kidCase: KidCase;
   record: LessonRecord;
+  therapist?: Therapist;
   onClose: () => void;
 }
 
-export default function PrintRecordTable({ kidCase, record, onClose }: PrintRecordTableProps) {
+export default function PrintRecordTable({ kidCase, record, therapist, onClose }: PrintRecordTableProps) {
   const handlePrint = () => {
     window.print();
   };
+
+  const therapistName = therapist?.name || kidCase.therapistName || '主責治療師';
+  const specialty = therapist?.specialty || kidCase.specialty || '職能治療';
+  const licenseNumber = therapist?.licenseNumber || '';
 
   // 格式化日期 e.g. 2026-05-10 為 民國 115 年 5 月 10 日
   const formatTaiwanDate = (dateStr: string) => {
@@ -113,11 +118,11 @@ export default function PrintRecordTable({ kidCase, record, onClose }: PrintReco
               <div className="col-span-4 border-b border-l border-black p-2 grid grid-cols-2">
                 <div className="flex items-center">
                   <span className="font-semibold shrink-0">療育人員：</span>
-                  <span className="ml-1">{kidCase.therapistName || '許美華'}</span>
+                  <span className="ml-1 font-medium">{therapistName}</span>
                 </div>
                 <div className="border-l border-gray-300 pl-2 flex items-center">
                   <span className="font-semibold shrink-0">專業別：</span>
-                  <span className="ml-1">{kidCase.specialty || '職能治療'}</span>
+                  <span className="ml-1 text-xs">{specialty}</span>
                 </div>
               </div>
             </div>
@@ -265,8 +270,22 @@ export default function PrintRecordTable({ kidCase, record, onClose }: PrintReco
             </div>
 
             {/* 列印提示與簽署 */}
-            <div className="mt-8 text-right text-xs text-slate-400 print:text-black font-mono">
-              OT-Care 電子化認證簽章：TS-{record.id.toUpperCase()}
+            <div className="mt-8 flex flex-wrap justify-between items-end gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-gray-800">
+                <span className="font-semibold">療育人員簽章：</span>
+                <span className="font-bold underline decoration-slate-400 underline-offset-4 text-sm font-serif">
+                  {therapistName}
+                </span>
+                {licenseNumber && (
+                  <span className="text-gray-600 font-mono text-xs ml-1">
+                    （證號：{licenseNumber}）
+                  </span>
+                )}
+              </div>
+              <div className="text-right text-xs text-slate-400 print:text-black font-mono">
+                OT-Care 電子化認證簽章：TS-{record.id.toUpperCase()}
+                {licenseNumber && <span className="ml-2">| 執照字號：{licenseNumber}</span>}
+              </div>
             </div>
           </div>
         </div>
