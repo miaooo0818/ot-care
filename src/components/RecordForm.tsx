@@ -5,7 +5,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { KidCase, LessonRecord, HomeActivityStatus, SCORE_OPTIONS, HOME_ACTIVITY_STATUS_DETAILS } from '../types';
-import { Calendar, PenTool, CheckCircle, HelpCircle, Save, X, RotateCcw, User } from 'lucide-react';
+import { Calendar, PenTool, CheckCircle, HelpCircle, Save, X, RotateCcw, User, Sparkles, BookOpen, Plus, Trash2, Clock, Wand2, Bot } from 'lucide-react';
+import QuickPhraseSelector from './QuickPhraseSelector';
+import AIRecordGeneratorModal from './AIRecordGeneratorModal';
+import { DEFAULT_QUICK_PHRASES } from '../quickPhrases';
 
 interface RecordFormProps {
   kidCase: KidCase;
@@ -15,25 +18,146 @@ interface RecordFormProps {
 }
 
 export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: RecordFormProps) {
-  // 欄位 State
-  const [date, setDate] = useState(recordToEdit?.date || new Date().toISOString().split('T')[0]);
-  const [summary, setSummary] = useState(recordToEdit?.summary || '');
+  const draftStorageKey = `ot_record_draft_${kidCase.id}_${recordToEdit ? recordToEdit.id : 'new'}`;
+
+  // 嘗試讀取本地草稿
+  const savedDraft = React.useMemo(() => {
+    try {
+      const item = localStorage.getItem(draftStorageKey);
+      if (item) return JSON.parse(item);
+    } catch (e) {
+      console.error('Failed to parse draft from localStorage:', e);
+    }
+    return null;
+  }, [draftStorageKey]);
+
+  // 欄位 State (若有暫存草稿則優先復原，若無則依序採用 recordToEdit 或預設值)
+  const [date, setDate] = useState<string>(
+    savedDraft?.date || recordToEdit?.date || new Date().toISOString().split('T')[0]
+  );
+  const [summary, setSummary] = useState<string>(
+    savedDraft?.summary !== undefined ? savedDraft.summary : (recordToEdit?.summary || '')
+  );
   const [scores, setScores] = useState<{ [goalId: string]: number }>(
-    recordToEdit?.scores || 
+    savedDraft?.scores || recordToEdit?.scores || 
     kidCase.goals.reduce((acc, g) => ({ ...acc, [g.id]: 2 }), {}) // 預設達到目標 2分
   );
-  const [homeActivityAdvice, setHomeActivityAdvice] = useState(recordToEdit?.homeActivityAdvice || '');
-  const [caregiverFeedback, setCaregiverFeedback] = useState(recordToEdit?.caregiverFeedback || '');
-  const [caregiverStatus, setCaregiverStatus] = useState<HomeActivityStatus>(recordToEdit?.caregiverStatus || '');
+  const [homeActivityAdvice, setHomeActivityAdvice] = useState<string>(
+    savedDraft?.homeActivityAdvice !== undefined ? savedDraft.homeActivityAdvice : (recordToEdit?.homeActivityAdvice || '')
+  );
+  const [caregiverFeedback, setCaregiverFeedback] = useState<string>(
+    savedDraft?.caregiverFeedback !== undefined ? savedDraft.caregiverFeedback : (recordToEdit?.caregiverFeedback || '')
+  );
+  const [caregiverStatus, setCaregiverStatus] = useState<HomeActivityStatus>(
+    savedDraft?.caregiverStatus !== undefined ? savedDraft.caregiverStatus : (recordToEdit?.caregiverStatus || '')
+  );
   const [signatureType, setSignatureType] = useState<'text' | 'canvas'>(
-    recordToEdit?.signature?.startsWith('data:image') ? 'canvas' : 'text'
+    savedDraft?.signatureType || (recordToEdit?.signature?.startsWith('data:image') ? 'canvas' : 'text')
   );
-  const [signatureText, setSignatureText] = useState(
-    recordToEdit?.signature && !recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : ''
+  const [signatureText, setSignatureText] = useState<string>(
+    savedDraft?.signatureText !== undefined 
+      ? savedDraft.signatureText 
+      : (recordToEdit?.signature && !recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : '')
   );
-  const [signatureImage, setSignatureImage] = useState(
-    recordToEdit?.signature && recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : ''
+  const [signatureImage, setSignatureImage] = useState<string>(
+    savedDraft?.signatureImage !== undefined 
+      ? savedDraft.signatureImage 
+      : (recordToEdit?.signature && recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : '')
   );
+
+  // 草稿狀態提示
+  const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(!!savedDraft);
+  const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string | null>(
+    savedDraft?.savedAt ? new Date(savedDraft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null
+  );
+
+  // useEffect 監聽輸入欄位變動，自動防呆暫存至 localStorage
+  useEffect(() => {
+    const hasMeaningfulContent = 
+      summary.trim().length > 0 || 
+      homeActivityAdvice.trim().length > 0 || 
+      caregiverFeedback.trim().length > 0 || 
+      signatureText.trim().length > 0 || 
+      signatureImage.length > 0;
+
+    if (hasMeaningfulContent) {
+      const now = new Date();
+      const draftData = {
+        date,
+        summary,
+        scores,
+        homeActivityAdvice,
+        caregiverFeedback,
+        caregiverStatus,
+        signatureType,
+        signatureText,
+        signatureImage,
+        savedAt: now.toISOString()
+      };
+
+      try {
+        localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        setLastAutoSavedTime(timeStr);
+      } catch (err) {
+        console.warn('LocalStorage save failed:', err);
+      }
+    }
+  }, [date, summary, scores, homeActivityAdvice, caregiverFeedback, caregiverStatus, signatureType, signatureText, signatureImage, draftStorageKey]);
+
+  // 捨棄草稿重新填寫
+  const handleDiscardDraft = () => {
+    if (window.confirm('確定要捨棄當前已自動暫存的草稿並重設所有欄位嗎？')) {
+      localStorage.removeItem(draftStorageKey);
+      setDate(recordToEdit?.date || new Date().toISOString().split('T')[0]);
+      setSummary(recordToEdit?.summary || '');
+      setScores(recordToEdit?.scores || kidCase.goals.reduce((acc, g) => ({ ...acc, [g.id]: 2 }), {}));
+      setHomeActivityAdvice(recordToEdit?.homeActivityAdvice || '');
+      setCaregiverFeedback(recordToEdit?.caregiverFeedback || '');
+      setCaregiverStatus(recordToEdit?.caregiverStatus || '');
+      setSignatureType(recordToEdit?.signature?.startsWith('data:image') ? 'canvas' : 'text');
+      setSignatureText(recordToEdit?.signature && !recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : '');
+      setSignatureImage(recordToEdit?.signature && recordToEdit.signature.startsWith('data:image') ? recordToEdit.signature : '');
+      clearCanvas();
+      setHasRestoredDraft(false);
+      setLastAutoSavedTime(null);
+    }
+  };
+
+  // 常用詞彙彈窗 State
+  const [isQuickPhraseOpen, setIsQuickPhraseOpen] = useState(false);
+  const [quickPhraseTarget, setQuickPhraseTarget] = useState<'summary' | 'homeActivityAdvice' | 'caregiverFeedback'>('summary');
+
+  // AI 生成紀錄彈窗 State
+  const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false);
+
+  const handleOpenQuickPhrase = (target: 'summary' | 'homeActivityAdvice' | 'caregiverFeedback') => {
+    setQuickPhraseTarget(target);
+    setIsQuickPhraseOpen(true);
+  };
+
+  const handleInsertPhrase = (text: string, target: 'summary' | 'homeActivityAdvice' | 'caregiverFeedback') => {
+    if (target === 'summary') {
+      setSummary(prev => prev.trim() ? `${prev.trim()}\n${text}` : text);
+    } else if (target === 'homeActivityAdvice') {
+      setHomeActivityAdvice(prev => prev.trim() ? `${prev.trim()}\n${text}` : text);
+    } else if (target === 'caregiverFeedback') {
+      setCaregiverFeedback(prev => prev.trim() ? `${prev.trim()}\n${text}` : text);
+    }
+  };
+
+  // 篩選與當前個案階段推薦的快速快捷標籤
+  const popularSummaryPhrases = DEFAULT_QUICK_PHRASES.filter(
+    p => p.targetField === 'summary' && (!p.stage || p.stage === 'all' || p.stage === kidCase.stage)
+  ).slice(0, 5);
+
+  const popularHomePhrases = DEFAULT_QUICK_PHRASES.filter(
+    p => p.targetField === 'homeActivityAdvice'
+  ).slice(0, 4);
+
+  const popularFeedbackPhrases = DEFAULT_QUICK_PHRASES.filter(
+    p => p.targetField === 'caregiverFeedback'
+  ).slice(0, 4);
 
   // Canvas 手寫參考
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -130,6 +254,13 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
     // 獲取簽名
     const signature = signatureType === 'text' ? signatureText : signatureImage;
 
+    // 清除該筆暫存草稿
+    try {
+      localStorage.removeItem(draftStorageKey);
+    } catch (err) {
+      console.warn('Failed to clear draft on submit:', err);
+    }
+
     onSave({
       caseId: kidCase.id,
       date,
@@ -149,10 +280,18 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
         {/* Header */}
         <div className="bg-geometric-black text-white px-6 py-4 flex justify-between items-center tracking-wide shrink-0 border-b border-geometric-dark">
           <div>
-            <h2 className="font-display font-black text-base sm:text-lg flex items-center gap-2 text-white">
-              <Calendar className="w-5 h-5 text-geometric-accent" />
-              {recordToEdit ? `編輯『${kidCase.name}』療育紀錄` : `登錄『${kidCase.name}』課後服務紀錄`}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="font-display font-black text-base sm:text-lg flex items-center gap-2 text-white">
+                <Calendar className="w-5 h-5 text-geometric-accent" />
+                {recordToEdit ? `編輯『${kidCase.name}』療育紀錄` : `登錄『${kidCase.name}』課後服務紀錄`}
+              </h2>
+              {lastAutoSavedTime && (
+                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-emerald-400 bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 rounded font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  自動暫存 {lastAutoSavedTime}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
               階段：{kidCase.stage === 'early' ? '早療-學齡前' : '弱療-國小七歲以上個案'} | 主要照顧者：{kidCase.caregiverName}
             </p>
@@ -165,9 +304,59 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
           </button>
         </div>
 
+        {/* 若有載入未完成草稿，顯示貼心提示列 */}
+        {hasRestoredDraft && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between text-xs text-amber-800 shrink-0">
+            <div className="flex items-center gap-2 font-medium">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>已自動載入您上次編輯未儲存的暫存草稿內容。</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="text-amber-900 hover:text-rose-700 font-bold underline flex items-center gap-1 cursor-pointer text-[11px]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              捨棄草稿重填
+            </button>
+          </div>
+        )}
+
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           
+          {/* AI 智能生成紀錄快捷橫幅 */}
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 rounded-xl p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md shadow-indigo-950/20 border border-indigo-800/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-indigo-500 p-0.5 shrink-0 flex items-center justify-center shadow-md shadow-amber-400/10">
+                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                  <Wand2 className="w-5 h-5 text-amber-300 animate-pulse" />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-extrabold text-white tracking-wide flex items-center gap-1.5">
+                    Gemini AI 智能臨床紀錄生成
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40 px-1.5 py-0.2 rounded">
+                    AI OT Assistant
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-200 mt-0.5">
+                  自動彙整本堂各評估目標得分，一鍵摘要出符合早期療育規範的專業觀察與居家建議
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAIGeneratorOpen(true)}
+              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-lg shadow-md shadow-amber-500/20 transition cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-slate-950" />
+              <span>AI 生成紀錄</span>
+            </button>
+          </div>
+
           {/* 紀錄日期 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -260,10 +449,31 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
           </div>
 
           {/* 療育活動簡述 */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-800 mb-1">
-              療育活動內容簡述
-            </label>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center flex-wrap gap-1.5">
+              <label className="block text-sm font-bold text-slate-800">
+                療育活動內容簡述 <span className="text-rose-500">*</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAIGeneratorOpen(true)}
+                  className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-md transition cursor-pointer"
+                >
+                  <Wand2 className="w-3.5 h-3.5 text-amber-700" />
+                  AI 生成
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenQuickPhrase('summary')}
+                  className="flex items-center gap-1 text-xs font-bold text-geometric-accent hover:text-geometric-active bg-indigo-50 hover:bg-indigo-100/80 px-2.5 py-1 rounded-md transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  常用詞彙庫
+                </button>
+              </div>
+            </div>
+            
             <textarea
               required
               rows={3}
@@ -272,6 +482,23 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
               onChange={e => setSummary(e.target.value)}
               className="w-full text-sm p-3 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-slate-850"
             />
+
+            {/* 快速常用快捷標籤 */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] font-bold text-slate-400 shrink-0">常選推薦：</span>
+              {popularSummaryPhrases.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleInsertPhrase(p.text, 'summary')}
+                  title={p.text}
+                  className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 text-slate-600 rounded-md transition cursor-pointer flex items-center gap-1 truncate max-w-[200px]"
+                >
+                  <Plus className="w-3 h-3 text-slate-400" />
+                  <span className="truncate">{p.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <hr className="border-slate-100" />
@@ -284,10 +511,30 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
             </h3>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  給主要照顧者的居家活動建議 (建議填寫)
-                </label>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center flex-wrap gap-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    給主要照顧者的居家活動建議 (建議填寫)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsAIGeneratorOpen(true)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded transition cursor-pointer"
+                    >
+                      <Wand2 className="w-3 h-3 text-amber-700" />
+                      AI 智能建議
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenQuickPhrase('homeActivityAdvice')}
+                      className="flex items-center gap-1 text-[11px] font-bold text-geometric-accent hover:text-geometric-active bg-indigo-50 hover:bg-indigo-100/80 px-2 py-0.5 rounded transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      常用衛教詞彙
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   rows={2}
                   placeholder="例如：建議孩子每天在家堆疊大積木10個、利用黏土捏製湯圓等練習手部精細力道..."
@@ -295,6 +542,22 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
                   onChange={e => setHomeActivityAdvice(e.target.value)}
                   className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:outline-hidden"
                 />
+                {/* 居家快捷詞彙標籤 */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0">常選建議：</span>
+                  {popularHomePhrases.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleInsertPhrase(p.text, 'homeActivityAdvice')}
+                      title={p.text}
+                      className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-slate-200 text-slate-600 rounded-md transition cursor-pointer flex items-center gap-1 truncate max-w-[200px]"
+                    >
+                      <Plus className="w-3 h-3 text-slate-400" />
+                      <span className="truncate">{p.title}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -334,10 +597,20 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    家長回饋內容 (可直接寫入或電訪紀錄)
-                  </label>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-xs font-bold text-slate-700">
+                      家長回饋內容 (可直接寫入或電訪紀錄)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenQuickPhrase('caregiverFeedback')}
+                      className="flex items-center gap-1 text-[11px] font-bold text-geometric-accent hover:text-geometric-active bg-indigo-50 hover:bg-indigo-100/80 px-2 py-0.5 rounded transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      常用回饋
+                    </button>
+                  </div>
                   <textarea
                     rows={2}
                     placeholder="小晴回家抓筆比較順，但要大人在旁邊要求才要認真寫..."
@@ -345,6 +618,21 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
                     onChange={e => setCaregiverFeedback(e.target.value)}
                     className="w-full text-sm p-2 bg-white border border-slate-300 rounded-lg focus:outline-hidden"
                   />
+                  {/* 回饋快捷標籤 */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    {popularFeedbackPhrases.slice(0, 2).map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleInsertPhrase(p.text, 'caregiverFeedback')}
+                        title={p.text}
+                        className="text-[10px] px-1.5 py-0.5 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 border border-slate-200 text-slate-600 rounded transition cursor-pointer flex items-center gap-0.5 truncate max-w-[150px]"
+                      >
+                        <Plus className="w-2.5 h-2.5 text-slate-400" />
+                        <span className="truncate">{p.title}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -426,24 +714,68 @@ export default function RecordForm({ kidCase, recordToEdit, onSave, onClose }: R
         </form>
 
         {/* Footer */}
-        <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-geometric-border shrink-0 select-none font-display">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-geometric-border text-slate-700 text-sm rounded hover:bg-slate-100 transition font-bold cursor-pointer"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="flex items-center gap-1.5 px-6 py-2 bg-geometric-accent hover:bg-geometric-active text-white text-sm rounded shadow-md shadow-geometric-accent/15 transition font-extrabold cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            儲存紀錄
-          </button>
+        <div className="bg-slate-50 px-6 py-4 flex flex-wrap gap-2 justify-between items-center border-t border-geometric-border shrink-0 select-none font-display">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-geometric-border text-slate-700 text-sm rounded hover:bg-slate-100 transition font-bold cursor-pointer"
+            >
+              取消
+            </button>
+            {lastAutoSavedTime && (
+              <span className="sm:hidden text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-mono">
+                已自動暫存 {lastAutoSavedTime}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSubmit}
+              className="flex items-center gap-1.5 px-6 py-2 bg-geometric-accent hover:bg-geometric-active text-white text-sm rounded shadow-md shadow-geometric-accent/15 transition font-extrabold cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              儲存紀錄
+            </button>
+          </div>
         </div>
 
       </div>
+
+      {/* 職能治療常用詞彙庫彈窗 */}
+      {isQuickPhraseOpen && (
+        <QuickPhraseSelector
+          stage={kidCase.stage}
+          activeTargetField={quickPhraseTarget}
+          onSelectPhrase={(phraseText, target) => {
+            handleInsertPhrase(phraseText, target);
+          }}
+          onClose={() => setIsQuickPhraseOpen(false)}
+        />
+      )}
+
+      {/* Gemini AI 智能臨床紀錄生成彈窗 */}
+      {isAIGeneratorOpen && (
+        <AIRecordGeneratorModal
+          kidCase={kidCase}
+          date={date}
+          scores={scores}
+          currentSummary={summary}
+          currentHomeAdvice={homeActivityAdvice}
+          caregiverStatus={caregiverStatus}
+          onApplyAll={(aiSummary, aiHomeAdvice) => {
+            setSummary(aiSummary);
+            setHomeActivityAdvice(aiHomeAdvice);
+          }}
+          onApplySummary={(aiSummary) => {
+            setSummary(aiSummary);
+          }}
+          onApplyHomeAdvice={(aiHomeAdvice) => {
+            setHomeActivityAdvice(aiHomeAdvice);
+          }}
+          onClose={() => setIsAIGeneratorOpen(false)}
+        />
+      )}
     </div>
   );
 }
