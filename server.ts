@@ -105,35 +105,49 @@ ${extraKeywords ? `- 補充觀察重點/關鍵字：${extraKeywords}` : ''}
 
 請一律以繁體中文 (台灣醫事術語) 輸出 JSON 格式。`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: {
-              type: Type.STRING,
-              description: '專業的療育活動內容簡述 (80-150字)',
-            },
-            homeActivityAdvice: {
-              type: Type.STRING,
-              description: '給主要照顧者的居家活動建議 (60-110字)',
-            },
-            clinicalInsight: {
-              type: Type.STRING,
-              description: '臨床重點洞察與下堂課調整重點 (40-70字)',
+    let text = '';
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash'];
+    let lastError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                summary: {
+                  type: Type.STRING,
+                  description: '專業的療育活動內容簡述 (80-150字)',
+                },
+                homeActivityAdvice: {
+                  type: Type.STRING,
+                  description: '給主要照顧者的居家活動建議 (60-110字)',
+                },
+                clinicalInsight: {
+                  type: Type.STRING,
+                  description: '臨床重點洞察與下堂課調整重點 (40-70字)',
+                },
+              },
+              required: ['summary', 'homeActivityAdvice', 'clinicalInsight'],
             },
           },
-          required: ['summary', 'homeActivityAdvice', 'clinicalInsight'],
-        },
-      },
-    });
+        });
+        if (response.text) {
+          text = response.text;
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} call failed, trying fallback...`, err?.message);
+      }
+    }
 
-    const text = response.text;
     if (!text) {
-      return res.status(500).json({ error: 'AI 暫未能產生文字內容，請稍後重試。' });
+      throw lastError || new Error('AI 暫未能產生文字內容，請稍後重試。');
     }
 
     const parsed = JSON.parse(text);
@@ -143,6 +157,137 @@ ${extraKeywords ? `- 補充觀察重點/關鍵字：${extraKeywords}` : ''}
     });
   } catch (error: any) {
     console.error('Error generating AI record:', error);
+    const errorMessage = error?.message || '生成失敗，請檢查 Gemini API 設定。';
+    return res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+// 3. Gemini AI 依期初現況智能生成「量化療育目標行為範本」
+app.post('/api/gemini/generate-goal-target', async (req, res) => {
+  try {
+    const {
+      baseline,
+      kidName,
+      kidAge,
+      kidStage,
+      therapyDuration = '半年 (6個月)',
+      customFocus,
+    } = req.body;
+
+    if (!baseline || typeof baseline !== 'string' || baseline.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '請提供期初能力行為現況描述，以便 AI 產生對應之量化目標。',
+      });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: '系統未設定 GEMINI_API_KEY 環境變數。',
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const stageDescription = kidStage === 'early' 
+      ? '學齡前兒童 (0-6歲早期療育)' 
+      : (kidStage === 'weak' ? '國小學童 (弱療 / 學校適應與身心發展)' : '兒童發展療育');
+
+    const prompt = `你是一位精通早期療育與兒童職能治療（Pediatric OT）的資深臨床督導與治療師。
+請根據老師所輸入的「個案期初能力行為現況描述 (起點 Baseline)」，為其量身制定符合 SMART 原則、高量化、精準對應現況的「預期達成之療育目標行為 (Target Behavior)」。
+
+【個案與療程資訊】
+- 個案姓名: ${kidName || '個案兒童'}
+- 年齡/階段: ${kidAge ? `${kidAge} 歲` : ''} (${stageDescription})
+- 預計療程長度: ${therapyDuration}
+- 老師輸入之期初能力現況描述 (起點):
+"${baseline.trim()}"
+${customFocus ? `- 老師指定重點方向: ${customFocus}` : ''}
+
+【目標制定核心指引（極重要）】
+1. **高度量化與可測量性 (Quantifiable & Measurable)**：
+   - 必須包含明確的測量數據，例如：連續成功次數（如「連續 3 次」）、時間秒數（如「維持單腳站立達 5 秒」）、達成機率（如「在 10 次嘗試中有 8 次」）、尺寸/空間精度（如「在 2 公分正方格內著色不溢出 >80%」）、距離/高度公分、減少口語或身體提示次數（如「僅需 1 次口語提示即可...」）等。
+2. **緊密對應現況起點 (Directly Targets Baseline Weakness)**：
+   - 針對現況中的不足或困難（如：抓握無力、跳躍不穩、注意力維持短、情緒調節困難、雙側協調不佳），給予階梯式提升之目標。
+3. **符合療程時程與年齡適應性**：
+   - 設定難度符合該年齡層在 ${therapyDuration} 內合理可達成的目標。
+
+請輸出 JSON 格式，包含：
+1. primaryTarget: 最推薦、最標準且兼具臨床可執行性的量化目標描述 (35-70字)。
+2. targetOptions: 陣列，提供 3 個不同向度/難度層次的量化目標選項供老師挑選：
+   - option 1: 【標準階段目標】聚焦核心功能障礙之量化突破。
+   - option 2: 【進階挑戰目標】提高標準、增加連續度、抗干擾或減少輔助。
+   - option 3: 【生活與學校應用目標】將動作/認知能力轉移至日常生活自理或教室常規情境。
+3. clinicalRationale: 簡短說明為何如此量化與關鍵評估指標 (30-60字)。
+
+一律使用繁體中文（台灣早療臨床術語）。`;
+
+    let text = '';
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash'];
+    let lastError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                primaryTarget: {
+                  type: Type.STRING,
+                  description: '最推薦之核心量化療育目標描述',
+                },
+                targetOptions: {
+                  type: Type.ARRAY,
+                  description: '3個不同難度/情境之量化目標選項',
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING, description: '選項標籤，例如：標準階段目標、進階挑戰目標、生活應用目標' },
+                      target: { type: Type.STRING, description: '具體量化的目標行為文字' },
+                      metric: { type: Type.STRING, description: '本目標之關鍵量化指標，例如：5秒內完成、連續成功3次、溢出率<10%' },
+                    },
+                    required: ['title', 'target', 'metric'],
+                  },
+                },
+                clinicalRationale: {
+                  type: Type.STRING,
+                  description: '臨床設定與量化理由說明',
+                },
+              },
+              required: ['primaryTarget', 'targetOptions', 'clinicalRationale'],
+            },
+          },
+        });
+        if (response.text) {
+          text = response.text;
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} goal target call failed, trying fallback...`, err?.message);
+      }
+    }
+
+    if (!text) {
+      throw lastError || new Error('AI 暫未能產生目標內容，請稍後重試。');
+    }
+
+    const parsed = JSON.parse(text);
+    return res.json({
+      success: true,
+      data: parsed,
+    });
+  } catch (error: any) {
+    console.error('Error generating AI goal target:', error);
     const errorMessage = error?.message || '生成失敗，請檢查 Gemini API 設定。';
     return res.status(500).json({
       success: false,
