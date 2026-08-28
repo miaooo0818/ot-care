@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { KidCase, LessonRecord, Goal, KidStage, HomeActivityStatus, SCORE_OPTIONS, HOME_ACTIVITY_STATUS_DETAILS, GoalTemplate } from '../types';
+import { KidCase, LessonRecord, Goal, KidStage, HomeActivityStatus, SCORE_OPTIONS, HOME_ACTIVITY_STATUS_DETAILS, GoalTemplate, Therapist } from '../types';
 import { 
   Shield, Lock, Unlock, Key, Settings, Trash2, Edit, FileSpreadsheet, 
   FileText, Download, Printer, Search, ArrowLeft, LogOut, Info, 
@@ -15,7 +15,9 @@ interface AdminPanelProps {
   cases: KidCase[];
   records: LessonRecord[];
   goalTemplates: GoalTemplate[];
+  therapist: Therapist;
   onUpdateTemplates: (updated: GoalTemplate[]) => void;
+  onUpdateTherapist: (updated: Therapist) => void;
   onBack: () => void;
   onUpdateCases: (updatedCases: KidCase[]) => void;
   onUpdateRecords: (updatedRecords: LessonRecord[]) => void;
@@ -26,7 +28,9 @@ export default function AdminPanel({
   cases,
   records,
   goalTemplates,
+  therapist,
   onUpdateTemplates,
+  onUpdateTherapist,
   onBack,
   onUpdateCases,
   onUpdateRecords,
@@ -43,7 +47,7 @@ export default function AdminPanel({
   const [authError, setAuthError] = useState('');
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'cases' | 'records' | 'export' | 'templates'>('cases');
+  const [activeTab, setActiveTab] = useState<'cases' | 'records' | 'export' | 'templates' | 'settings'>('cases');
 
   // Directory Search states
   const [caseSearchQuery, setCaseSearchQuery] = useState('');
@@ -53,6 +57,17 @@ export default function AdminPanel({
   // Modals editing state
   const [editingCase, setEditingCase] = useState<KidCase | null>(null);
   const [editingRecord, setEditingRecord] = useState<LessonRecord | null>(null);
+
+  // 負責治療師相關編輯 State
+  const [therapistNameInput, setTherapistNameInput] = useState(therapist.name);
+  const [therapistSpecialtyInput, setTherapistSpecialtyInput] = useState(therapist.specialty);
+  const [therapistLicenseInput, setTherapistLicenseInput] = useState(therapist.licenseNumber || '');
+
+  useEffect(() => {
+    setTherapistNameInput(therapist.name);
+    setTherapistSpecialtyInput(therapist.specialty);
+    setTherapistLicenseInput(therapist.licenseNumber || '');
+  }, [therapist]);
 
   // 新增 / 編輯模板之 State
   const [isAddingTemplate, setIsAddingTemplate] = useState(false);
@@ -589,6 +604,17 @@ export default function AdminPanel({
         >
           <Award className="w-4 h-4 text-emerald-500" />
           全系統預設目標範本庫
+        </button>
+        <button
+          onClick={() => { setActiveTab('settings'); }}
+          className={`px-5 py-3 text-xs font-black tracking-wider border-b-2 transition cursor-pointer flex items-center gap-2 ${
+            activeTab === 'settings'
+              ? 'border-geometric-accent text-geometric-accent bg-indigo-50/20'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <Settings className="w-4 h-4 text-blue-500" />
+          負責治療師師資設定
         </button>
       </div>
 
@@ -1215,6 +1241,95 @@ export default function AdminPanel({
                 </div>
               ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: SYSTEM AND THERAPIST SETTINGS */}
+      {activeTab === 'settings' && (
+        <div className="bg-white border border-geometric-border rounded-xl shadow-xs p-6 space-y-6 animate-fadeIn">
+          <div className="border-b border-slate-100 pb-4 select-none">
+            <h2 className="text-base font-display font-black text-geometric-black flex items-center gap-2">
+              <Settings className="w-5 h-5 text-blue-500" />
+              負責師資姓名與學術專長設定
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              在此修改當前主責職能治療師的真實姓名與專業科別，此變更將會即時套用至 Header、新建立個案卡以及所有的課堂簽核紀錄中。
+            </p>
+          </div>
+
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!therapistNameInput.trim() || !therapistSpecialtyInput.trim()) {
+                alert('負責人員姓名與科別不得為空！');
+                return;
+              }
+              onUpdateTherapist({
+                username: therapist.username || 'ot_user',
+                name: therapistNameInput.trim(),
+                specialty: therapistSpecialtyInput.trim(),
+                licenseNumber: therapistLicenseInput.trim()
+              });
+              alert('🎉 負責師資姓名、專業科別與執照字號已成功儲存並同步更新至全系統！');
+            }}
+            className="space-y-4 max-w-xl text-xs font-semibold"
+          >
+            <div className="space-y-3">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5 font-display">
+                  負責師（老師）真實姓名
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={therapistNameInput}
+                  onChange={(e) => setTherapistNameInput(e.target.value)}
+                  placeholder="例如：許美華"
+                  className="w-full text-xs px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent font-semibold text-slate-850"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5 font-display">
+                  專業類別 / 臨床特長
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={therapistSpecialtyInput}
+                  onChange={(e) => setTherapistSpecialtyInput(e.target.value)}
+                  placeholder="例如：兒童職能治療 (OT)"
+                  className="w-full text-xs px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent font-semibold text-slate-850"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5 font-display">
+                  治療師執照字號 / 證書證號
+                </label>
+                <input
+                  type="text"
+                  value={therapistLicenseInput}
+                  onChange={(e) => setTherapistLicenseInput(e.target.value)}
+                  placeholder="例如：職字第 003829 號"
+                  className="w-full text-xs px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent font-semibold text-slate-850"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  此證號將自動帶入「臺中市早期療育服務記錄表」列印與簽章頁面。
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-4 flex items-center gap-3">
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-geometric-accent hover:bg-geometric-accent/90 text-white font-display font-bold rounded-lg transition shadow-md shadow-geometric-accent/20 cursor-pointer text-xs flex items-center gap-1.5 select-none"
+              >
+                <Check className="w-4 h-4" />
+                儲存並同步全系統與 Header 設定
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
