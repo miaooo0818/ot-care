@@ -7,8 +7,10 @@ import React, { useState } from 'react';
 import { KidCase, LessonRecord, Goal, SCORE_OPTIONS, HOME_ACTIVITY_STATUS_DETAILS, GoalTemplate } from '../types';
 import { 
   ArrowLeft, Calendar, Phone, Shield, Plus, Edit, Trash2, Printer, 
-  ChevronRight, Sparkles, AlertCircle, Award, PenTool, CheckSquare, X
+  ChevronRight, Sparkles, AlertCircle, Award, PenTool, CheckSquare, X, RefreshCw, Check, Clock
 } from 'lucide-react';
+import { calculateTherapyPeriodEnd, checkTherapyPeriodStatus } from '../utils/periodUtils';
+import RenewPeriodModal from './RenewPeriodModal';
 
 interface CaseDetailProps {
   kidCase: KidCase;
@@ -35,11 +37,14 @@ export default function CaseDetail({
 }: CaseDetailProps) {
   // 控制 State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+
   const [name, setName] = useState(kidCase.name);
   const [birthday, setBirthday] = useState(kidCase.birthday);
   const [caregiverName, setCaregiverName] = useState(kidCase.caregiverName);
   const [phone, setPhone] = useState(kidCase.phone);
   const [therapyPeriodStart, setTherapyPeriodStart] = useState(kidCase.therapyPeriodStart);
+  const [selectedDuration, setSelectedDuration] = useState<3 | 6>(6);
   const [therapyPeriodEnd, setTherapyPeriodEnd] = useState(kidCase.therapyPeriodEnd);
   const [therapistName, setTherapistName] = useState(kidCase.therapistName);
   const [specialty, setSpecialty] = useState(kidCase.specialty);
@@ -55,6 +60,24 @@ export default function CaseDetail({
     setTherapistName(kidCase.therapistName);
     setSpecialty(kidCase.specialty);
   }, [kidCase]);
+
+  // When therapyPeriodStart or selectedDuration changes in edit profile
+  const handleStartMonthChange = (startVal: string) => {
+    setTherapyPeriodStart(startVal);
+    if (startVal) {
+      setTherapyPeriodEnd(calculateTherapyPeriodEnd(startVal, selectedDuration));
+    }
+  };
+
+  const handleDurationChange = (dur: 3 | 6) => {
+    setSelectedDuration(dur);
+    if (therapyPeriodStart) {
+      setTherapyPeriodEnd(calculateTherapyPeriodEnd(therapyPeriodStart, dur));
+    }
+  };
+
+  // Check period status for renewal banner/alert
+  const periodStatus = checkTherapyPeriodStatus(kidCase.therapyPeriodEnd);
 
   // 目標管理 State
   const [isAddingGoal, setIsAddingGoal] = useState(false);
@@ -348,6 +371,13 @@ export default function CaseDetail({
 
         <div className="flex flex-wrap gap-2.5 w-full sm:w-auto font-display">
           <button
+            onClick={() => setIsRenewModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-geometric-accent border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center shadow-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            建立新一期檔案 / 續期
+          </button>
+          <button
             onClick={() => setIsEditingProfile(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 border border-geometric-border hover:bg-slate-50 text-slate-705 rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center"
           >
@@ -363,6 +393,44 @@ export default function CaseDetail({
           </button>
         </div>
       </div>
+
+      {/* 療育期程到期 / 即將屆滿通知橫幅 */}
+      {(periodStatus.isExpired || periodStatus.isExpiringSoon) && (
+        <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in ${
+          periodStatus.isExpired 
+            ? 'bg-amber-500/10 border-amber-500/30 text-amber-950' 
+            : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-950'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+              periodStatus.isExpired ? 'bg-amber-500/20 text-amber-700' : 'bg-indigo-500/20 text-indigo-700'
+            }`}>
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-display font-extrabold text-sm flex items-center gap-2">
+                <span>療育期限通知：{periodStatus.isExpired ? '原療育期程已到期' : '原療育期程即將於本月屆滿'}</span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  periodStatus.isExpired ? 'bg-amber-600 text-white' : 'bg-indigo-600 text-white'
+                }`}>
+                  {kidCase.therapyPeriodStart} ~ {kidCase.therapyPeriodEnd}
+                </span>
+              </h4>
+              <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                原療育期限已屆滿，請老師建立新一期檔案。系統將自動帶入舊有個案資料與前期目標作為參照，協助您快速訂定新學期目標。
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsRenewModalOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-geometric-black hover:bg-geometric-dark text-white rounded-lg text-xs font-display font-bold transition shrink-0 cursor-pointer shadow-sm select-none"
+          >
+            <RefreshCw className="w-4 h-4 text-amber-400" />
+            立即建立新一期檔案
+          </button>
+        </div>
+      )}
 
       {/* 個案精緻名片區 */}
       <div className="bg-geometric-black text-white rounded-xl overflow-hidden p-6 relative border border-geometric-dark/30 shadow-md">
@@ -704,26 +772,64 @@ export default function CaseDetail({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-700 mb-1">療育期間 (起)</label>
-                  <input
-                    type="month"
-                    required
-                    value={therapyPeriodStart}
-                    onChange={e => setTherapyPeriodStart(e.target.value)}
-                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent"
-                  />
+              <div className="bg-slate-50 p-3.5 border border-geometric-border rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-800 font-bold text-xs">
+                    療育期間設定
+                  </label>
+                  <div className="flex gap-1.5 select-none">
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(6)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                        selectedDuration === 6
+                          ? 'bg-geometric-accent text-white border-geometric-accent shadow-xs'
+                          : 'bg-white text-slate-600 border-geometric-border hover:bg-slate-100'
+                      }`}
+                    >
+                      {selectedDuration === 6 && <Check className="w-3 h-3" />}
+                      半年 (6個月)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(3)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                        selectedDuration === 3
+                          ? 'bg-geometric-accent text-white border-geometric-accent shadow-xs'
+                          : 'bg-white text-slate-600 border-geometric-border hover:bg-slate-100'
+                      }`}
+                    >
+                      {selectedDuration === 3 && <Check className="w-3 h-3" />}
+                      三個月
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-slate-700 mb-1">療育期間 (迄)</label>
-                  <input
-                    type="month"
-                    required
-                    value={therapyPeriodEnd}
-                    onChange={e => setTherapyPeriodEnd(e.target.value)}
-                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-600 text-[11px] mb-1 font-semibold">
+                      起始月份 (自選) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      required
+                      value={therapyPeriodStart}
+                      onChange={e => handleStartMonthChange(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 text-[11px] mb-1 font-semibold">
+                      療育期間 (訖) (自動計算) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      required
+                      value={therapyPeriodEnd}
+                      onChange={e => setTherapyPeriodEnd(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent text-xs font-mono font-bold"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -908,6 +1014,17 @@ export default function CaseDetail({
           </div>
         </div>
       )}
+
+      {/* 建立新一期檔案 / 續期彈窗 */}
+      <RenewPeriodModal
+        kidCase={kidCase}
+        goalTemplates={goalTemplates}
+        isOpen={isRenewModalOpen}
+        onClose={() => setIsRenewModalOpen(false)}
+        onConfirmRenewal={(renewedCase) => {
+          onEditCase(renewedCase);
+        }}
+      />
 
     </div>
   );
