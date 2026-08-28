@@ -12,8 +12,6 @@ import {
   Calendar, Users, Award, X, Check, Plus, AlertTriangle, ChevronRight, BarChart3, Star, Filter, FolderPlus
 } from 'lucide-react';
 import AIGoalTargetGenerator from './AIGoalTargetGenerator';
-import ExportDocxModal from './ExportDocxModal';
-import { exportCombinedCasesToDocx } from '../utils/docxExport';
 
 interface AdminPanelProps {
   cases: KidCase[];
@@ -128,7 +126,6 @@ export default function AdminPanel({
 
   // Selected Kid for Semester Summary Report Card
   const [selectedReportKidId, setSelectedReportKidId] = useState<string>('');
-  const [isDocxModalOpen, setIsDocxModalOpen] = useState(false);
 
   // Password setup/auth verification
   useEffect(() => {
@@ -840,113 +837,7 @@ export default function AdminPanel({
 
       {/* TAB 3: FILE EXPORT & COMPREHENSIVE PROGRESS REPORT */}
       {activeTab === 'export' && (
-        <div className="space-y-6">
-          {/* Top Featured: Standard DOCX Export Center */}
-          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-6 shadow-md border border-indigo-500/20">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="space-y-1.5 max-w-2xl">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                    Official DOCX Form Generator
-                  </span>
-                  <span className="text-[11px] text-slate-300">
-                    分為早療（學齡前）／ 弱療（國小）
-                  </span>
-                </div>
-                <h2 className="text-lg md:text-xl font-display font-black text-white tracking-wide flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-indigo-400" />
-                  臺中市療育服務記錄表 (Word / DOCX) 匯出專區
-                </h2>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  格式嚴格依照中國醫藥大學孫世恆副教授編制規範（A4 橫向、標楷體、期初能力現況與目標對齊、歷次評分及居家活動狀況），可匯出為可編輯的 Microsoft Word (.docx) 檔案。
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2.5 w-full md:w-auto shrink-0 font-display">
-                <button
-                  type="button"
-                  onClick={() => setIsDocxModalOpen(true)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-xs font-black transition cursor-pointer shadow-lg shadow-indigo-500/25 active:scale-98"
-                >
-                  <Download className="w-4 h-4" />
-                  自訂選項並匯出 Word
-                </button>
-              </div>
-            </div>
-
-            {/* Quick action cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-4 border-t border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={async () => {
-                  const earlyCases = cases.filter(c => c.stage === 'early');
-                  if (earlyCases.length === 0) {
-                    alert('目前系統中尚無學齡前早療個案！');
-                    return;
-                  }
-                  await exportCombinedCasesToDocx(earlyCases, records, '學齡前早療個案彙編', { therapist });
-                }}
-                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
-              >
-                <div>
-                  <div className="font-bold text-white group-hover:text-indigo-200 transition">
-                    匯出早療個案 Word (.docx)
-                  </div>
-                  <div className="text-[10px] text-slate-300 mt-0.5">
-                    學齡前早療・共 {earlyCount} 位（獨立分頁彙整）
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-indigo-300 opacity-80 group-hover:opacity-100" />
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const weakCases = cases.filter(c => c.stage === 'weak');
-                  if (weakCases.length === 0) {
-                    alert('目前系統中尚無國小弱療個案！');
-                    return;
-                  }
-                  await exportCombinedCasesToDocx(weakCases, records, '國小弱療個案彙編', { therapist });
-                }}
-                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
-              >
-                <div>
-                  <div className="font-bold text-white group-hover:text-emerald-200 transition">
-                    匯出弱療個案 Word (.docx)
-                  </div>
-                  <div className="text-[10px] text-slate-300 mt-0.5">
-                    國小弱療・共 {weakCount} 位（獨立分頁彙整）
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-emerald-300 opacity-80 group-hover:opacity-100" />
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  if (cases.length === 0) {
-                    alert('目前系統中尚無個案！');
-                    return;
-                  }
-                  await exportCombinedCasesToDocx(cases, records, '全體個案總彙編', { therapist });
-                }}
-                className="p-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-left transition cursor-pointer group"
-              >
-                <div>
-                  <div className="font-bold text-white group-hover:text-amber-200 transition">
-                    匯出全體個案總彙編 Word
-                  </div>
-                  <div className="text-[10px] text-slate-300 mt-0.5">
-                    包含早療與弱療・共 {cases.length} 位
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-amber-300 opacity-80 group-hover:opacity-100" />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Left Panel: CSV Data Center */}
           <div className="lg:col-span-4 bg-white border border-geometric-border rounded-xl p-5 space-y-4 shadow-xs">
@@ -1915,15 +1806,6 @@ export default function AdminPanel({
           </div>
         </div>
       )}
-
-      {/* 批次匯出 Word / DOCX 彈窗 */}
-      <ExportDocxModal
-        isOpen={isDocxModalOpen}
-        onClose={() => setIsDocxModalOpen(false)}
-        allCases={cases}
-        allRecords={records}
-        therapist={therapist}
-      />
 
     </div>
   );
