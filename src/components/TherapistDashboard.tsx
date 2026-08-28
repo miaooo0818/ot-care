@@ -10,6 +10,8 @@ import {
   Baby, GraduationCap, ChevronRight, X, Phone, Calendar, ClipboardList, Check, AlertCircle 
 } from 'lucide-react';
 import { calculateTherapyPeriodEnd, checkTherapyPeriodStatus } from '../utils/periodUtils';
+import AIGoalTargetGenerator from './AIGoalTargetGenerator';
+import DomainBehaviorSelector from './DomainBehaviorSelector';
 
 interface TherapistDashboardProps {
   cases: KidCase[];
@@ -18,6 +20,7 @@ interface TherapistDashboardProps {
   therapist: Therapist;
   onSelectCase: (caseId: string) => void;
   onAddCase: (newCase: KidCase) => void;
+  onSaveGoalTemplate?: (template: { category?: string; baseline: string; target: string }) => void;
 }
 
 export default function TherapistDashboard({ 
@@ -26,7 +29,8 @@ export default function TherapistDashboard({
   goalTemplates,
   therapist,
   onSelectCase, 
-  onAddCase 
+  onAddCase,
+  onSaveGoalTemplate
 }: TherapistDashboardProps) {
   // 搜尋過濾 State
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +49,7 @@ export default function TherapistDashboard({
   // 隨案直接添加第一條期初目標，以便快速體驗
   const [initBaseline, setInitBaseline] = useState('');
   const [initTarget, setInitTarget] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('精細動作');
 
   const handleStartChange = (val: string) => {
     setTherapyPeriodStart(val);
@@ -120,6 +125,15 @@ export default function TherapistDashboard({
 
     onAddCase(newCase);
 
+    // 若有填寫期初行為現況與目標，自動將其建檔儲存至範本庫中，以利之後使用
+    if (initBaseline.trim() && onSaveGoalTemplate) {
+      onSaveGoalTemplate({
+        category: selectedCategory || '精細動作',
+        baseline: initBaseline.trim(),
+        target: initTarget.trim() || '依臨床量化目標達成',
+      });
+    }
+
     // 重設 form
     setName('');
     setBirthday('');
@@ -127,6 +141,7 @@ export default function TherapistDashboard({
     setPhone('');
     setInitBaseline('');
     setInitTarget('');
+    setSelectedCategory('精細動作');
     setIsAddOpen(false);
   };
 
@@ -542,85 +557,68 @@ export default function TherapistDashboard({
                     <Award className="w-4 h-4 text-amber-500 animate-pulse" />
                     隨案設定首件期初目標 (選填，可於個案詳情新增更多)
                   </span>
-
-                  {/* 範本套用下拉選單 */}
-                  <select
-                    onChange={(e) => {
-                      const tplId = e.target.value;
-                      if (!tplId) return;
-                      const selectedTpl = goalTemplates.find(t => t.id === tplId);
-                      if (selectedTpl) {
-                        setInitBaseline(selectedTpl.baseline);
-                        setInitTarget(selectedTpl.target);
-                      }
-                      e.target.value = ''; // 恢復
-                    }}
-                    className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded cursor-pointer font-bold max-w-[180px] truncate"
-                  >
-                    <option value="">🍀套用臨床目標目標範本...</option>
-                    {goalTemplates.map(t => (
-                      <option key={t.id} value={t.id}>
-                        [{t.category}] {t.baseline.substring(0, 18)}...
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    支援領域行為選單與自動建檔存入範本
+                  </span>
                 </div>
+
+                {/* 領域 ➔ 行為表現 兩階段範本選單 */}
+                <DomainBehaviorSelector
+                  goalTemplates={goalTemplates}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={(cat) => setSelectedCategory(cat)}
+                  onSelectTemplate={(tpl) => {
+                    setInitBaseline(tpl.baseline);
+                    setInitTarget(tpl.target);
+                    setSelectedCategory(tpl.category);
+                  }}
+                  onSaveNewTemplate={(tplData) => {
+                    if (onSaveGoalTemplate) {
+                      onSaveGoalTemplate(tplData);
+                    }
+                  }}
+                  currentBaseline={initBaseline}
+                  currentTarget={initTarget}
+                />
                 
-                <div className="space-y-2">
+                <div className="space-y-2.5 pt-1">
                   <div>
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 mb-0.5">
-                      <label className="block text-slate-500 text-[11px]">期初能力行為現況描述</label>
-                      <select
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            setInitBaseline(e.target.value);
-                          }
-                          e.target.value = '';
-                        }}
-                        className="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-350 px-1 py-0.5 rounded cursor-pointer max-w-[200px] font-semibold focus:outline-hidden"
-                      >
-                        <option value="">📋 選擇期初能力範本...</option>
-                        {goalTemplates.map(t => (
-                          <option key={t.id} value={t.baseline}>
-                            [{t.category}] {t.baseline.substring(0, 18)}...
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <label className="block text-slate-700 text-[11px] font-bold mb-1">
+                      期初能力行為現況描述 (Baseline) <span className="text-slate-400 font-normal">（可由上方選單點選帶入或直接手動修改）</span>
+                    </label>
                     <textarea
-                      rows={1.5}
-                      placeholder="例：精細三指抓握力氣不均，常超出書寫格線範圍外"
+                      rows={2}
+                      placeholder="例：精細三指抓握力氣不均，常超出書寫格線範圍外，無法在2公分圓圈內著色"
                       value={initBaseline}
                       onChange={e => setInitBaseline(e.target.value)}
-                      className="w-full text-xs p-2 border border-geometric-border rounded-md focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
+                      className="w-full text-xs p-2.5 border border-geometric-border rounded-md focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
                     />
                   </div>
+
+                  {/* AI 智能量化目標生成工具 */}
+                  <div className="pt-0.5">
+                    <AIGoalTargetGenerator
+                      baseline={initBaseline}
+                      kidName={name}
+                      kidAge={getAge(birthday)}
+                      kidStage={getAge(birthday) < 6 ? 'early' : 'weak'}
+                      therapyDuration={selectedDuration === 6 ? '半年 (6個月)' : '三個月'}
+                      customFocus={selectedCategory}
+                      currentTarget={initTarget}
+                      onApplyTarget={(targetText) => setInitTarget(targetText)}
+                    />
+                  </div>
+
                   <div>
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 mb-0.5">
-                      <label className="block text-slate-500 text-[11px]">預期達成之療育目標行為</label>
-                      <select
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            setInitTarget(e.target.value);
-                          }
-                          e.target.value = '';
-                        }}
-                        className="text-[9px] bg-sky-50 hover:bg-sky-100 text-sky-850 border border-sky-150 px-1 py-0.5 rounded cursor-pointer max-w-[200px] font-semibold focus:outline-hidden"
-                      >
-                        <option value="">🎯 選擇期待目標範本...</option>
-                        {goalTemplates.map(t => (
-                          <option key={t.id} value={t.target}>
-                            [{t.category}] {t.target.substring(0, 18)}...
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <label className="block text-slate-700 text-[11px] font-bold mb-1">
+                      預期達成之療育目標行為 (Target) <span className="text-slate-400 font-normal">（可點擊上方 AI 智能生成直接套用）</span>
+                    </label>
                     <textarea
-                      rows={1.5}
-                      placeholder="例：能成熟地將中文字在 2 公分正方格中央書寫不溢出"
+                      rows={2}
+                      placeholder="例：能成熟地將中文字在 2 公分正方格中央書寫不溢出，10次嘗試中達成8次"
                       value={initTarget}
                       onChange={e => setInitTarget(e.target.value)}
-                      className="w-full text-xs p-2 border border-geometric-border rounded-md focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
+                      className="w-full text-xs p-2.5 border border-geometric-border rounded-md focus:outline-hidden focus:ring-1 focus:ring-geometric-accent bg-white text-slate-800 font-medium"
                     />
                   </div>
                 </div>
