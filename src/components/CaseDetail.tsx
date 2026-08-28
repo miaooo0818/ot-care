@@ -13,7 +13,6 @@ import { calculateTherapyPeriodEnd, checkTherapyPeriodStatus } from '../utils/pe
 import RenewPeriodModal from './RenewPeriodModal';
 import AIGoalTargetGenerator from './AIGoalTargetGenerator';
 import DomainBehaviorSelector from './DomainBehaviorSelector';
-import ExportDocxModal from './ExportDocxModal';
 
 interface CaseDetailProps {
   kidCase: KidCase;
@@ -43,7 +42,6 @@ export default function CaseDetail({
   // 控制 State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
-  const [isDocxModalOpen, setIsDocxModalOpen] = useState(false);
 
   const [name, setName] = useState(kidCase.name);
   const [birthday, setBirthday] = useState(kidCase.birthday);
@@ -394,13 +392,6 @@ export default function CaseDetail({
 
         <div className="flex flex-wrap gap-2.5 w-full sm:w-auto font-display">
           <button
-            onClick={() => setIsDocxModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center shadow-sm"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            匯出 DOCX 記錄表 (Word)
-          </button>
-          <button
             onClick={() => setIsRenewModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-geometric-accent border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer transition w-full sm:w-auto justify-center shadow-xs"
           >
@@ -595,21 +586,10 @@ export default function CaseDetail({
 
       {/* 歷次療育服務紀錄歷程 */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 select-none">
-          <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-1.5">
-            <Award className="w-4 h-4 text-geometric-accent" />
-            歷次療育課後分數表現與紀錄歷程 ({records.length} 堂)
-          </h3>
-          {records.length > 0 && (
-            <button
-              onClick={() => setIsDocxModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition cursor-pointer self-start sm:self-auto shadow-2xs"
-            >
-              <FileText className="w-3.5 h-3.5 text-indigo-600" />
-              匯出整期服務記錄表 (.docx)
-            </button>
-          )}
-        </div>
+        <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-1.5 select-none">
+          <Award className="w-4 h-4 text-geometric-accent" />
+          歷次療育課後分數表現與紀錄歷程 ({records.length} 堂)
+        </h3>
 
         {descRecords.length === 0 ? (
           <div className="bg-white p-12 text-center border border-dashed border-geometric-border rounded-xl space-y-3">
@@ -1041,14 +1021,6 @@ export default function CaseDetail({
           onEditCase(renewedCase);
         }}
         onSaveGoalTemplate={onSaveGoalTemplate}
-      />
-
-      {/* 匯出 Word / DOCX 彈窗 */}
-      <ExportDocxModal
-        isOpen={isDocxModalOpen}
-        onClose={() => setIsDocxModalOpen(false)}
-        kidCase={kidCase}
-        records={records}
       />
 
     </div>
