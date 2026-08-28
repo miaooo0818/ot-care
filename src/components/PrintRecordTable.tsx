@@ -3,10 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { KidCase, LessonRecord, Therapist, HOME_ACTIVITY_STATUS_DETAILS } from '../types';
-import { Printer, X, FileText, Download, CheckCircle } from 'lucide-react';
-import { exportCaseToDocx } from '../utils/docxExport';
+import { Printer, X, FileText, Check } from 'lucide-react';
 
 interface PrintRecordTableProps {
   kidCase: KidCase;
@@ -16,36 +15,13 @@ interface PrintRecordTableProps {
 }
 
 export default function PrintRecordTable({ kidCase, record, therapist, onClose }: PrintRecordTableProps) {
-  const [isExportingDocx, setIsExportingDocx] = useState(false);
-  const [docxSuccess, setDocxSuccess] = useState(false);
-
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleExportDocx = async () => {
-    try {
-      setIsExportingDocx(true);
-      await exportCaseToDocx({
-        kidCase,
-        records: [record],
-        therapist,
-      });
-      setDocxSuccess(true);
-      setTimeout(() => setDocxSuccess(false), 3000);
-    } catch (err) {
-      console.error('Export DOCX error:', err);
-      alert('匯出 Word 檔案時發生錯誤');
-    } finally {
-      setIsExportingDocx(false);
-    }
   };
 
   const therapistName = therapist?.name || kidCase.therapistName || '主責治療師';
   const specialty = therapist?.specialty || kidCase.specialty || '職能治療';
   const licenseNumber = therapist?.licenseNumber || '';
-  const isEarly = kidCase.stage === 'early';
-  const formTitle = isEarly ? '臺中市早期療育服務記錄表' : '臺中市早期療育弱勢服務記錄表';
 
   // 格式化日期 e.g. 2026-05-10 為 民國 115 年 5 月 10 日
   const formatTaiwanDate = (dateStr: string) => {
@@ -76,22 +52,12 @@ export default function PrintRecordTable({ kidCase, record, therapist, onClose }
         <div className="bg-geometric-black text-white px-6 py-4 flex items-center justify-between print:hidden shrink-0 border-b border-geometric-dark bg-none">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-geometric-accent" />
-            <span className="font-display font-black tracking-wide text-base sm:text-lg text-white">
-              {formTitle} - 列印與 Word 匯出
-            </span>
+            <span className="font-display font-black tracking-wide text-base sm:text-lg text-white">臺中市早期療育服務記錄表 - 列印預覽</span>
           </div>
-          <div className="flex items-center gap-2.5 font-display">
-            <button
-              onClick={handleExportDocx}
-              disabled={isExportingDocx}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-xs sm:text-sm font-extrabold shadow-md transition cursor-pointer text-white"
-            >
-              <Download className="w-4 h-4" />
-              {isExportingDocx ? '生成 Word 中...' : '匯出 Word (.docx)'}
-            </button>
+          <div className="flex items-center gap-3 font-display">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-geometric-accent hover:bg-geometric-active rounded text-xs sm:text-sm font-extrabold shadow-md shadow-geometric-accent/15 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-geometric-accent hover:bg-geometric-active rounded text-sm font-extrabold shadow-md shadow-geometric-accent/15 transition cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               列印此表 (PDF)
@@ -105,13 +71,6 @@ export default function PrintRecordTable({ kidCase, record, therapist, onClose }
           </div>
         </div>
 
-        {docxSuccess && (
-          <div className="bg-emerald-50 text-emerald-800 text-xs px-6 py-2 border-b border-emerald-200 flex items-center gap-2 font-bold">
-            <CheckCircle className="w-4 h-4 text-emerald-600" />
-            Word (.docx) 檔案已成功下載！
-          </div>
-        )}
-
         {/* 預覽與列印主體 */}
         <div id="print-area" className="flex-1 overflow-y-auto p-8 bg-slate-100 print:bg-white print:p-0 flex justify-center">
           <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-[15mm] border border-slate-200 shadow-sm print:border-none print:shadow-none print:p-0 text-black font-sans leading-relaxed text-sm antialiased">
@@ -121,13 +80,13 @@ export default function PrintRecordTable({ kidCase, record, therapist, onClose }
               <div>中國醫藥大學 孫世恆副教授編制</div>
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                <span>IACCB 國際兒童潛能發展協會</span>
+                <span>IACCB 國際兒童能力促進協會</span>
               </div>
             </div>
 
             {/* 標題 */}
             <h1 className="text-center font-bold text-xl tracking-widest text-gray-900 my-4">
-              {formTitle}
+              臺中市早期療育服務記錄表
             </h1>
 
             {/* 基本資料表格 */}
