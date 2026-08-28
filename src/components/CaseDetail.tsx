@@ -41,6 +41,20 @@ export default function CaseDetail({
   const [phone, setPhone] = useState(kidCase.phone);
   const [therapyPeriodStart, setTherapyPeriodStart] = useState(kidCase.therapyPeriodStart);
   const [therapyPeriodEnd, setTherapyPeriodEnd] = useState(kidCase.therapyPeriodEnd);
+  const [therapistName, setTherapistName] = useState(kidCase.therapistName);
+  const [specialty, setSpecialty] = useState(kidCase.specialty);
+
+  // Synchronize state when kidCase prop changes
+  React.useEffect(() => {
+    setName(kidCase.name);
+    setBirthday(kidCase.birthday);
+    setCaregiverName(kidCase.caregiverName);
+    setPhone(kidCase.phone);
+    setTherapyPeriodStart(kidCase.therapyPeriodStart);
+    setTherapyPeriodEnd(kidCase.therapyPeriodEnd);
+    setTherapistName(kidCase.therapistName);
+    setSpecialty(kidCase.specialty);
+  }, [kidCase]);
 
   // 目標管理 State
   const [isAddingGoal, setIsAddingGoal] = useState(false);
@@ -78,7 +92,9 @@ export default function CaseDetail({
       caregiverName,
       phone,
       therapyPeriodStart,
-      therapyPeriodEnd
+      therapyPeriodEnd,
+      therapistName,
+      specialty
     });
     setIsEditingProfile(false);
   };
@@ -706,6 +722,29 @@ export default function CaseDetail({
                     required
                     value={therapyPeriodEnd}
                     onChange={e => setTherapyPeriodEnd(e.target.value)}
+                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 mb-1">負責人員/老師姓名</label>
+                  <input
+                    type="text"
+                    required
+                    value={therapistName}
+                    onChange={e => setTherapistName(e.target.value)}
+                    className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1">物理、職能專業分群別</label>
+                  <input
+                    type="text"
+                    required
+                    value={specialty}
+                    onChange={e => setSpecialty(e.target.value)}
                     className="w-full px-3 py-2 border border-geometric-border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-geometric-accent"
                   />
                 </div>
